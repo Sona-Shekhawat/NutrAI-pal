@@ -6,7 +6,7 @@ with open("links.json","r")as f:
 
 class HealthyRecipeSpider(scrapy.Spider):
     name = 'healthy_recipe_spider'
-    start_urls=links[0:10]
+    start_urls=links
 
   
 
@@ -32,12 +32,12 @@ class HealthyRecipeSpider(scrapy.Spider):
                 tags.append(tag)
 
         yield {
-            'url': response.url,
             'name': safe_extract_text(response.css('h1.title.fn::text')),
             'ingredients': response.css('div#ingredients-list li.ingredient::text').getall(),
             'instructions': response.css('div#fld_instructions_and_steps p::text').getall(),
             'nutrition': nutrients,
             'time': safe_extract_text(response.css('div.cooking_time_text::text')).replace("Time to make:", "").strip(),
-            'serving_size': (safe_extract_text(response.css('span.serves::text')) or "").replace("Serves:", "").strip() or None,
+            'serving_size': (safe_extract_text(response.css('div.RECIPE_META_servings::text')) or "").replace("Serves:", "").strip() or None,
             'tags': tags
         }
+#  scrapy runspider healthy_recipes_spider.py -o recipes.json
