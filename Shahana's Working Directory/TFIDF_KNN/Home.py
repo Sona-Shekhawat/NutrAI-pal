@@ -37,5 +37,3 @@ if user_input:
         st.page_link("pages/1_RecipeChatPage.py", label="🍽 Go to Recipe Page", icon="➡️")
     else:
         st.warning("⚠️ Please submit nutrition goals before proceeding.")
-
-
