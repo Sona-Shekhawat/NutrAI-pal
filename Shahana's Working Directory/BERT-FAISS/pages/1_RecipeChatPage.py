@@ -46,7 +46,7 @@ def recommendation(user_input,nutritions_goals,df1,bert_model,index):
 
 
 if "nutritions_goals" not in st.session_state and "user_input" not in st.session_state:
-    st.warning("⚠️ Please submit your nutrition goals and input first")
+    st.warning("Please submit your nutrition goals and input first")
 else:
     nutritions_goals = st.session_state["nutritions_goals"]
     user_input=st.session_state["user_input"]
@@ -66,7 +66,8 @@ messages = [
 You are a nutritional cooking assistant. The user has the following pantry items: {user_input}.
 Their nutritional goals are: {nutritions_goals}.
 Here are a few suggested recipes based on their ingredients and dietary targets:
-{recipes_text}
+{recipes_text}..you could the top ranked .. recipes ... that is more similar to the users ... pantry items 
+and to nutrition goals . you could ask the user for more recipes 
 """
     ),
     HumanMessage(content=user_input)
@@ -76,8 +77,43 @@ result = model.invoke(messages)
 
 st.write(result.content)
 
-query=st.chat_input("Any Query....?")
+# Ensure message history exists
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
+
+# User input
+query = st.chat_input("Any questions about the recipes or need more suggestions?")
 
 if query:
-    response=model.invoke(query)
-    st.write(response.content)
+    # Add user query to chat history
+    st.session_state.chat_history.append(HumanMessage(content=query))
+
+    # Add system message again to re-inject the context
+    system_message = SystemMessage(
+        content=f"""
+You are a nutritional cooking assistant. The user has the following pantry items: {user_input}.
+Their nutritional goals are: {nutritions_goals}.
+These were your top recipe suggestions:
+{recipes_text}
+Stick to these while replying, and give recipe tips, alternatives, substitutions, etc.
+"""
+    )
+
+    all_messages = [system_message] + st.session_state.chat_history
+
+    # Get AI response
+    ai_response = model.invoke(all_messages)
+
+    # Save AI reply
+    st.session_state.chat_history.append(AIMessage(content=ai_response.content))
+
+# Display the full chat
+for msg in st.session_state.chat_history:
+    if isinstance(msg, HumanMessage):
+        st.markdown(f"You: {msg.content}")
+    elif isinstance(msg, AIMessage):
+        st.markdown(f"NutriBot:{msg.content}")
+
+
+
+
