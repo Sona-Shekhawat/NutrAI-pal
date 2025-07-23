@@ -53,10 +53,14 @@ else:
 
 
 
+
+
+
 recommendations =recommendation(user_input,nutritions_goals,df1,bert_model,index)
 
+
 recipes_text = "\n".join([
-f"{row['name']} (Tags: {row['tags']})"
+f"{row['name']} (Tags: {row['tags']}) (Ingredients:{row['ingredients']}) (Instructions:{row['instructions']})"
 for row, _ in recommendations
 ])
 # collect all the messages
@@ -66,8 +70,8 @@ messages = [
 You are a nutritional cooking assistant. The user has the following pantry items: {user_input}.
 Their nutritional goals are: {nutritions_goals}.
 Here are a few suggested recipes based on their ingredients and dietary targets:
-{recipes_text}..you could the top ranked .. recipes ... that is more similar to the users ... pantry items 
-and to nutrition goals . you could ask the user for more recipes 
+{recipes_text}..you give could the top ranked .. recipes ... that is more similar to the users ... pantry items 
+and to nutrition goals in the format tags,ingredients,instructions,cooking time, serving size should also be considered if the user has mentioned. you could ask the user for more recipes 
 """
     ),
     HumanMessage(content=user_input)
