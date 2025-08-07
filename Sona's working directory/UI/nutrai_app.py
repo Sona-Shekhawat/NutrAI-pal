@@ -3,8 +3,14 @@ import streamlit as st
 import pandas as pd
 import pickle
 import numpy as np
-from langchain_ollama import ChatOllama
+# from langchain_ollama import ChatOllama
 from langchain.prompts import ChatPromptTemplate
+from langchain_google_genai import ChatGoogleGenerativeAI
+# from langchain.chains import RetrievalQA
+# from langchain.vectorstores import FAISS  # or your KNN-based retriever
+# from langchain_google_genai import GoogleGenerativeAIEmbeddings
+
+import os 
 
 st.title("Nutra-AI")
 st.header("AI powered nutrition-based recipe recommendation system")
@@ -21,15 +27,17 @@ with open("nutrients_scaler.pkl", "rb") as f:
     scaler = pickle.load(f)
 
 # loading our dataset
-recipes = pd.read_csv("Dataset_combined.csv")
+recipes = pd.read_csv("Dataset_combined2.csv")
 
 # building the UI
 st.subheader("Enter your information")
 
-age = st.number_input("Age")
+age = st.number_input("Age", value=25)
 gender = st.radio("Gender",["Male","Female"],1)
-height = st.number_input("Height (cm)")
-weight = st.number_input("Weight (kg)")
+height = st.number_input("Height (cm)", value= 155)
+weight = st.number_input("Weight (kg)", value = 55)
+fiber = st.number_input("Fiber (g)",value=8)
+sodium = st.number_input("sodium (mg)",value = 500)
 
 def calculate_nutrition(age, weight_kg, height_cm, gender):
     """
@@ -52,35 +60,28 @@ def calculate_nutrition(age, weight_kg, height_cm, gender):
     fat_grams = (0.25 * calories) / 9  # 25% of calories from fat
     carbs_grams = (0.50 * calories) / 4  # 50% from carbs
 
-    # Fiber recommendation
-    if gender.lower() == 'male':
-        fiber_grams = 30 if age >= 18 else 25
-    else:
-        fiber_grams = 25 if age >= 18 else 20
-
-    # Sodium (upper limit, in mg)
-    sodium_mg = 2300  # standard for healthy adults
 
     return {
-        "calories": round(calories),
-        "protein (g)": round(protein_grams, 1),
-        "carbohydrates (g)": round(carbs_grams, 1),
-        "fat (g)": round(fat_grams, 1),
-        "fiber (g)": fiber_grams,
-        "sodium (mg)": sodium_mg
+        "calories": round(calories/3.5),   # divinding the final by 3 as these estimates are for whole three meals, multiplying by 4 as the serving size of recipes are 4
+        "protein (g)": round(protein_grams/3.5, 1),
+        "carbohydrates (g)": round(carbs_grams/3.5, 1),
+        "fat (g)": round(fat_grams/3.5, 1)
     }
 
-ingredients = st.text_area("Enter your pantry items",placeholder="paneer capsicum milk cheeze")
+ingredients = st.text_area("Enter your pantry items",value="rice coconut dal vegetable")
 
 if st.button("Get recipes"):
     st.session_state.selected_recipe_index = None
 
     #scaling nutrients
-    nutrients = np.array(list(calculate_nutrition(age,weight,height,gender).values()), ndmin=2)
-    scaled_nutrients = scaler.transform(nutrients)
+    calories, protein, carb, fat = calculate_nutrition(age,weight,height,gender).values()
+    nutrients = np.array([calories, protein, carb, fat, fiber, sodium], ndmin=2)
+    st.write("Based on your BMR, your nutritional needs are: ")
+    st.write(pd.DataFrame(nutrients,columns=["calories","protein (g)", "carbohydrates (g)", "fat (g)", "fiber (g)", "sodium (mg)"]))
+    scaled_nutrients = scaler.transform(nutrients*0.5)
     #vectorizing ingredients
     vectorizer_ingredients = vectorizer.transform([ingredients])
-    vectorizer_ingredients = vectorizer_ingredients.toarray()
+    vectorizer_ingredients = vectorizer_ingredients.toarray()*2.5  
 
     input_features = np.hstack((scaled_nutrients,vectorizer_ingredients))
 
@@ -95,7 +96,7 @@ if st.button("Get recipes"):
     st.session_state.user_input = {
         'matched_recipes': matched_recipes, 'resultant_names':resultant_names, 'pantry': ingredients
     }
-    st.session_state.user_nutrition = calculate_nutrition(age,weight,height,gender)
+    st.session_state.user_nutrition = {'calories':calories, 'protien':protein, 'carbohydrates':carb, 'fat': fat, 'sodium':sodium, 'fiber':fiber }
 
 # Initialize session state
 if "selected_recipe_index" not in st.session_state:
@@ -125,28 +126,34 @@ elif "user_input" in st.session_state:
 
     #ingredients
     st.subheader("Ingredients")
-    ingredients = eval(recipe["ingredients"])
+    # cleaning unicode data
+    from clean_unicode_help import clean_unicode
+    import ast
+    # cleaning unicode
+    
+
+    ingredients = ast.literal_eval(recipe["ingredients"])
     for item in ingredients:
-        st.markdown(f"\t\t\t- {item}")
+        cleaned = clean_unicode(item)
+        st.markdown(f"\t\t\t- {cleaned}")
 
     #nutrition
     st.subheader("Nutrition")
-    nutrition = eval(recipe["nutrition"])
+    nutrition = ast.literal_eval(recipe["nutrition"])
     for key,value in nutrition.items():
         st.markdown(f"\t\t\t- {key}: {value}")
 
     #instructions
     st.subheader("Instructions")
-    instructions = eval(recipe["instructions"])
-    for item in instructions:
-        st.markdown(f"\t\t\t- {item}")
+    instructions = recipe["instructions"]
+    st.markdown(instructions)
 
     # for passing to llm
     result_formatted = recipe[['name','ingredients','nutrition','instructions']]
 
     # user query
     st.subheader("Need a variation? Ask AI")
-    user_needs = st.text_input("Enter your request",key="user_query" ,value="Replace paneer with tofu, make it gluten-free...")
+    user_needs = st.text_input("Enter your request",key="user_query", value="Make it vegetarian")
 
     #context prompt
     template = '''You are a nutrition assistant
@@ -155,18 +162,22 @@ elif "user_input" in st.session_state:
                 Here is the user entered nutrition needs and pantry items: 
                 {user_input}
                 Answer the following user query: {user_needs}, keeping in mind the required nutrition needs.
-                You can make ingredient substitions only from the provided recipies, do not generate a new recipe.
-                If you are unable to make substitions just say I don't know.
+                
 '''
 
     if user_needs:
-        model = ChatOllama(model="llama3.1")
+        # Load your Gemini API Key
+        os.environ["GOOGLE_API_KEY"] = "AIzaSyAonrrlhxfzhR5MyaPG_sVrPpDsUjyjpgk"  # use environment variable or Render secret
+
+        # Set up LLM
+        llm = ChatGoogleGenerativeAI(model="gemini-2.5-pro", temperature=0.3)
+
         prompt_template = ChatPromptTemplate.from_template(template)
         prompt = prompt_template.format(result_formatted=result_formatted,user_input=st.session_state.user_nutrition,
                                         user_needs=user_needs)
 
         try:
-            response = model.invoke(prompt)
+            response = llm.invoke(prompt)
             st.markdown("### AI Response")
             st.write(response.content)
         except Exception as e:
