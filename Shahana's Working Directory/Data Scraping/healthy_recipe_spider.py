@@ -6,12 +6,12 @@ with open("links.json","r")as f:
 
 class HealthyRecipeSpider(scrapy.Spider):
     name = 'healthy_recipe_spider'
-    start_urls=links
+    start_urls=links #start_urls , tells Scrapy where to start crawling
 
   
 
-    def parse(self, response):
-        def safe_extract_text(selector):
+    def parse(self, response): # response has the html of page and the metadata
+        def safe_extract_text(selector): # This functions helps avoid error if the element is missing
             return selector.get().strip() if selector else None
 
         # Extract nutrients as a dictionary
