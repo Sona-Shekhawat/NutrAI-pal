@@ -167,7 +167,7 @@ elif "user_input" in st.session_state:
 
     if user_needs:
         # Load your Gemini API Key
-        os.environ["GOOGLE_API_KEY"] = "AIzaSyAonrrlhxfzhR5MyaPG_sVrPpDsUjyjpgk"  # use environment variable or Render secret
+        os.environ["GOOGLE_API_KEY"] = st.secrets["MY_KEY"]  # use environment variable or Render secret
 
         # Set up LLM
         llm = ChatGoogleGenerativeAI(model="gemini-2.5-pro", temperature=0.3)
