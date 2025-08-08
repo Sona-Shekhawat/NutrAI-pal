@@ -6,7 +6,6 @@ spacy
 langchain
 langchain-community
 google-generativeai
-faiss-cpu
 python-dotenv
 nltk
 regex
