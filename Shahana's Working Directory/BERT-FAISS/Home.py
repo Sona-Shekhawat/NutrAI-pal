@@ -1,5 +1,7 @@
 import streamlit as st
 
+st.title("🥗 NUTRIAI-PAL")
+
 user_input = st.chat_input("What's in your pantry today?")
 
 with st.form("nutrition_form"):
